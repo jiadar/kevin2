@@ -18,13 +18,6 @@ sub pad4 {
   return sprintf("%04d", @_);
 }
 
-sub pad5 {
-  return sprintf("%05d", @_);
-}
-sub pad6 {
-  return sprintf("%07d", @_);
-}
-
 sub year {
   if (@_ < 18) {
     return 20;
@@ -87,70 +80,38 @@ sub process4Digits {
   return "error"
 }
 
-
+#incomplete
 sub processSSN {
   my ($data) = @_;
-  $_ = $data; 
-  if ($data = {s/-//}) {
-
-  if ($data = {s/-//}) {
-	return $_;
-}
-}
-  
-  
-}
-sub process5Digits {
-  my ($data) = @_;
-  if ($data =~ /^(\d{1,5})$/) {
-    return pad5($1);
-  }
-  return "error"
-}
-
-sub process7Digits {
-  my ($data) = @_;
-  if ($data =~ /^(\d{1,7})$/) {
-    return pad6($1);
-  }
-  return "error"
+  $_ = $data;
+  s/-//;
+  return $_;
 }
 
 #incomplete
 sub processEmail {
   my ($data) = @_;
-  $_ = $data; 
   if ($data =~ /\w+@\w+\.\w+/) {
-    return $_;
-  }
-  
-}
-
-sub processRelationship {
-  my ($data) = @_;
-    if ($data =~ /[PSCD]{1}/) {
     return $1;
   }
   return "error"
 }
+
+sub processRelationship {
+  my ($data) = @_;
+  if ($data =~ /[PSCD]{1}/) {
+    return $1;
+  }
+  return "error"
+}
+
 sub processProductId {
   my ($data) = @_;
-  $_ =$data;
   if ($data =~ /[PAP|PA]{1}/) {
-    return $_;
+    return $1;
   }
   return "error"
 }
-
-sub processMain {
-  my ($data) = @_;
-  $_ = $data;
-  if ($data =~ /[Y|N]{1}/) {
-    return $_;
-  }
-  return "error"
-}
-
 
 sub printRecord {
   my (@cols) = @_;
@@ -161,23 +122,10 @@ sub printRecord {
     $cols[4] . ',' .
     $cols[5] . ',' .
     $cols[6] . ',' .
-    processSSN($cols[7]) . ',' .
+    $cols[7] . ',' .
     process2Digits($cols[8]) . ',' .
     process2Digits($cols[9]) . ',' .
     process4Digits($cols[10]) . ',' .
-    $cols[11] . ',' .
-    $cols[13] . ',' .
-    $cols[14] . ',' .
-    process5Digits($cols[15]) . ',' .
-    process3Digits($cols[16]) . ',' .
-    process7Digits($cols[17]) . ',' .
-    processEmail($cols[18]) . ',' .
-    $cols[19] . ',' .
-    ($cols[22]) . ',' .
-    $cols[23] . ',' .
-    $cols[24] . ',' .
-    processMain($cols[25]) . ',' .
-    processProductId($cols[26]) . ',' .
     $cols[21] . ',' .
     "\n";
 }
@@ -208,4 +156,5 @@ foreach (@deps) {
   # Print the dependent data by dereferencing the saved column array
   printRecord(@{$_});
 }
+
 
