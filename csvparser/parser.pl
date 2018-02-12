@@ -41,7 +41,7 @@ sub effectiveDate {
       return pad($1) . qq(/) . pad($2) . qq(/) . year($3) . pad($3) ;
     }
   }
-  return "error"
+  return "Date error"
 }
 
 sub processStatus {
@@ -51,7 +51,7 @@ sub processStatus {
   if ($data =~ /^(\w{1,5})$/) {
     return $1;
   }
-  return "error"
+  return "Status error"
 }
 
 sub processClientId {
@@ -60,7 +60,7 @@ sub processClientId {
   if ($data =~ /^(\d{6})$/) {
     return $1;
   }
-  return "error"
+  return "6digits error"
 }
 
 sub process2Digits {
@@ -68,7 +68,7 @@ sub process2Digits {
   if ($data =~ /^(\d{1,2})$/) {
     return pad($1);
   }
-  return "error"
+  return "2digits error"
 }
 
 sub process3Digits {
@@ -76,7 +76,7 @@ sub process3Digits {
   if ($data =~ /^(\d{1,3})$/) {
     return pad3($1);
   }
-  return "error"
+  return "3digits error"
 }
 
 sub process4Digits {
@@ -84,7 +84,7 @@ sub process4Digits {
   if ($data =~ /^(\d{1,4})$/) {
     return pad4($1);
   }
-  return "error"
+  return "4digits error"
 }
 
 
@@ -92,28 +92,25 @@ sub processSSN {
   my ($data) = @_;
   $_ = $data; 
   if ($data = {s/-//}) {
+    return $_;
+  }
+  return "SSN error";
+}
 
-  if ($data = {s/-//}) {
-	return $_;
-}
-}
-  
-  
-}
 sub process5Digits {
   my ($data) = @_;
   if ($data =~ /^(\d{1,5})$/) {
     return pad5($1);
   }
-  return "error"
+  return "5 digits error"
 }
 
-sub process7Digits {
+sub processPhone {
   my ($data) = @_;
-  if ($data =~ /^(\d{1,7})$/) {
-    return pad6($1);
+  if ($data =~ /\d{3}(\d{3})(\d{4})/) { # fixed to detect just local part of phone number
+    return "$1-$2";  # return local part of phone number
   }
-  return "error"
+  return "phone error"
 }
 
 #incomplete
@@ -128,27 +125,43 @@ sub processEmail {
 
 sub processRelationship {
   my ($data) = @_;
-    if ($data =~ /[PSCD]{1}/) {
+  if ($data =~ /([PSCD])/) {
     return $1;
   }
-  return "error"
+  return "Relationship error"
 }
 sub processProductId {
   my ($data) = @_;
-  $_ =$data;
-  if ($data =~ /[PAP|PA]{1}/) {
-    return $_;
+  # Check optional fields like this
+  if ($data =~ /(PAP|PA)/) { # took out the []
+    return $1;
   }
-  return "error"
+  #print Dumper $data; # this is how I found it was a newline
+  if ($data =~ /\n/) { # check for newline (empty)
+    return '';
+  }
+  if (! $data) { # check for empty
+    return '';
+  }
+  return "ProductID Error"
 }
 
-sub processMain {
+# wrote this - there is no family/individual process
+sub processPlanType {
   my ($data) = @_;
-  $_ = $data;
-  if ($data =~ /[Y|N]{1}/) {
-    return $_;
+  if ($data =~ /(Individual|Family)/) { # took out the []
+    return $1
   }
-  return "error"
+  return "PlanType Error"
+}
+
+# Wrote this there was no processPrimary
+sub processPrimary {
+  my ($data) = @_;
+  if ($data =~ /([Y|N])/) {
+    return $1
+  }
+  return "Primary Error"
 }
 
 
@@ -165,45 +178,61 @@ sub printRecord {
     process2Digits($cols[8]) . ',' .
     process2Digits($cols[9]) . ',' .
     process4Digits($cols[10]) . ',' .
-    $cols[11] . ',' .
+    $cols[11] . ','  .
     $cols[13] . ',' .
     $cols[14] . ',' .
     process5Digits($cols[15]) . ',' .
     process3Digits($cols[16]) . ',' .
-    process7Digits($cols[17]) . ',' .
+    processPhone($cols[17]) . ',' . # this wants you to chop the phone to 7 digits
     processEmail($cols[18]) . ',' .
     $cols[19] . ',' .
-    ($cols[22]) . ',' .
-    $cols[23] . ',' .
-    $cols[24] . ',' .
-    processMain($cols[25]) . ',' .
-    processProductId($cols[26]) . ',' .
-    $cols[21] . ',' .
+    $cols[20] . ',' . # was missing "customer-defined" column
+    processRelationship($cols[21]) . ',' . # changed to 21
+    processPrimary($cols[22]) . ',' . # changed to 22, wrote process primary
+    $cols[23] . ',' . # added
+    $cols[24] . ',' . # added
+    processPlanType($cols[25]) . ',' .
+    processProductId($cols[26]) .
     "\n";
 }
 
 # Read from stdin - must pipe CSV into program
 my @deps;
 
+# Set a flag to test if we have read the header row or not
+my $read_header_row = 0;
+
+# Print the header row as the first thing we print
+print "Effective Date,", "Status,", "EmployeeID,", "ClientID,", "MemberFirstName,", "MemberMiddleName,",
+  "MemberLastName,", "MemberSSN,", "DOB_Month,", "DOB_Day,", "DOB_Year,", "Address1,", "Address2,", "City,",
+  "State,", "ZipCode,", "AreaCode,", "HomePhone,", "Email,", "Deduction Method,", "Customer-Defined,",
+  "Relationship,", "Primary,", "FamilyID,", "UniqueID,", "Plan_Type,", "ProductID\n";
+
 while(<STDIN>) {
-  # Split each line into an array by commas
-  my @cols = split /,/;
-  # See what is in each array
-  # print Dumper \@cols;
-  # Process the date (first element in the @cols array)
-
-  #  print processClientId($cols[3]) . "\n";
-
-  # Once everything is written, chain them all together for the output
-  if ($cols[21] =~ /P/) {
-    printRecord(@cols);
+  # If we have not read the header row, skip processing this line
+  if (! $read_header_row) {
+    $read_header_row = 1;
   }
+  # Otherwise, we have already read the header row, so process
   else {
+    # Split each line into an array by commas
+    my @cols = split /,/;
+    # See what is in each array
+    # print Dumper \@cols;
+    # Process the date (first element in the @cols array)
+
+    #  print processClientId($cols[3]) . "\n";
+
+    # Once everything is written, chain them all together for the output
     # Push a reference to the columns array onto dependents for later printing
-    push @deps, \@cols;
+    if ($cols[21] =~ /P/) {
+      printRecord(@cols)
+    }
+    else {
+      push @deps, \@cols;
+    }
   }
 }
-
 foreach (@deps) {
   # Print the dependent data by dereferencing the saved column array
   printRecord(@{$_});
